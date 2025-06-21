@@ -1,0 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<contentpackage name="Less Trip" modversion="1.0" corepackage="False" gameversion="1.6.19.1">
+  <Text file="%ModDir%/dummy.xml" />
+</contentpackage>
