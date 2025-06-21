@@ -1,12 +1,13 @@
 if SERVER then return end
 
-local Path = ...
+local configDirectoryPath = Game.SaveFolder .. "/ModConfigs"
+local configFilePath = configDirectoryPath .. "/lesstrip.json"
 
-if not File.Exists(Path .. "/config.json") then
-    File.Write(Path .. "/config.json", json.serialize({multiplier = 0.5}))
+if not File.Exists(configFilePath .. "/lesstrip.json") then
+    File.Write(configFilePath .. "/lesstrip.json", json.serialize({multiplier = 0.5}))
 end
 
-local config = json.parse(File.Read(Path .. "/config.json"))
+local config = json.parse(File.Read(configFilePath .. "/lesstrip.json"))
 --print(config.multiplier)
 
 LuaUserData.RegisterType('Barotrauma.AfflictionPrefab+Effect') 
