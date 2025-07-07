@@ -309,14 +309,13 @@ Hook.Add("stop", "LessTrip_CleanUp", function ()
     end
 end)
 
--- Doesnt seem like affliction prefabs get reset on round start
--- Hook.Add("roundStart", "LessTrip_Apply", function ()
---     for k, handler in pairs(handlers) do
---         if handler.func then
---             handler:func()
---         end
---     end
--- end)
+Hook.Add("roundStart", "LessTrip_Apply", function ()
+    for k, handler in pairs(handlers) do
+        if handler.func then
+            handler:func()
+        end
+    end
+end)
 
 for k, handler in pairs(handlers) do
     if handler.func then
