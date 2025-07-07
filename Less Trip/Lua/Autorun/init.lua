@@ -311,6 +311,12 @@ end)
 
 Hook.Add("roundStart", "LessTrip_Apply", function ()
     for k, handler in pairs(handlers) do
+        if handler.cleanup then
+            handler.cleanup()
+        end
+    end
+    
+    for k, handler in pairs(handlers) do
         if handler.func then
             handler:func()
         end
