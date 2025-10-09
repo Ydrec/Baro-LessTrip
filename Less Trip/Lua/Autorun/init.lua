@@ -14,6 +14,7 @@ local defaultconfig = {
     character_blur = 1,
     character_grain = 1,
     character_chromaticaberration = 1,
+    screenshake = 1,
 }
 
 
@@ -25,6 +26,14 @@ if not File.Exists(configFilePath) then
 end
 
 local config = json.parse(File.Read(configFilePath))
+
+local function CheckConfigHasAllKeys(config, keys)
+    for k in keys do
+        if not config[k] then
+            config[k] = defaultconfig[k] or 1
+        end
+    end
+end
 
 local function SaveConfig()
     File.Write(configFilePath, json.serialize(config))
@@ -270,6 +279,25 @@ local handlers = {
         cleanup = nil, --Lua patches are not persistent, dont need to clean
         active = false,
     },
+    screenshake = {
+        func = function(self, mult)
+            if mult then
+                config.screenshake = math.min(math.max(mult, 0), 1)
+                SaveConfig()
+            end
+            if not self.active and config.screenshake ~= 1 then
+                self.active = true
+                Hook.Patch('LessTrip_screenshake', 'Barotrauma.Camera', 'get_ShakePosition', function(instance, ptable)
+                    return ptable.ReturnValue * config.screenshake
+                end, Hook.HookMethodType.After)
+            elseif self.active and config.screenshake == 1 then
+                self.active = false
+                Hook.RemovePatch('LessTrip_screenshake', 'Barotrauma.Camera', 'get_ShakePosition', Hook.HookMethodType.After)
+            end
+        end,
+        cleanup = nil, --Lua patches are not persistent, dont need to clean
+        active = false,
+    },
 }
 
 local handlerKeys = {}
@@ -278,10 +306,12 @@ for k, v in pairs(handlers) do
     table.insert(handlerKeys, k)
 end
 
+CheckConfigHasAllKeys(config, handlerKeys)
 
 Game.AddCommand("lesstrip", "lesstrip [effecttype] [0-1]: Multiplies various effects by set values. 1 = no changes; 0 = completely invisible. Is persistent between sessions. character_ effects have small performance cost as always running patches but its necessary to override hardcoded effects: OxygenLow screen distort etc. Setting them to 1 removes patches.",
     function (args)
         if args[1] == nil then 
+            print("current values:")
             for k, v in pairs(config) do
                 print(k, " = ", v)
             end
