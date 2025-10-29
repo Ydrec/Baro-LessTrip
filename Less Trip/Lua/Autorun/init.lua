@@ -40,7 +40,12 @@ local function SaveConfig()
 end
 
 
-LuaUserData.RegisterType('Barotrauma.AfflictionPrefab+Effect') 
+LuaUserData.RegisterType('Barotrauma.AfflictionPrefab+Effect')
+local Effect = LuaUserData.CreateStatic('Barotrauma.AfflictionPrefab+Effect')
+
+LuaUserData.RegisterType('Barotrauma.AfflictionPrefab+PeriodicEffect')
+local PeriodicEffect = LuaUserData.CreateStatic('Barotrauma.AfflictionPrefab+PeriodicEffect')
+
 LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effect'], 'MaxAfflictionOverlayAlphaMultiplier')
 LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effect'], 'MinAfflictionOverlayAlphaMultiplier')
 
@@ -61,8 +66,17 @@ LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effe
 
 LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effect'], 'ScreenEffectFluctuationFrequency')
 
-LuaUserData.MakeMethodAccessible(Descriptors['Barotrauma.AfflictionPrefab'], 'LoadEffects')
+--LuaUserData.MakeMethodAccessible(Descriptors['Barotrauma.AfflictionPrefab'], 'LoadEffects')
 
+LuaUserData.MakeFieldAccessible(Descriptors['Barotrauma.AfflictionPrefab'], 'configElement')
+
+LuaUserData.RegisterType('Barotrauma.SerializableProperty')
+local SerializableProperty = LuaUserData.CreateStatic('Barotrauma.SerializableProperty')
+
+LuaUserData.RegisterType('Barotrauma.Serialize')
+local Serialize = LuaUserData.GetType("Barotrauma.Serialize")
+
+--LuaUserData.RegisterType('System.Attribute')
 
 
 local function Exists(tbl, key)
@@ -73,6 +87,89 @@ local function Exists(tbl, key)
     end
     return false
 end
+
+
+--moonsharp auto conversion of singles to doubles fucks up TrySetValue
+local flt = LuaUserData.RegisterType('System.Single')
+local floatType = LuaUserData.GetType("System.Single")
+local function tofloat(value)
+    return LuaUserData.CreateUserDataFromDescriptor(tonumber(value), flt)
+end
+
+
+local function ResetAfflictionPrefabEffects(afflictionprefab)
+    local effects = afflictionprefab.Effects
+    local NextEffectElement = afflictionprefab.configElement.GetChildElements("effect")
+
+    local periodiceffects = afflictionprefab.PeriodicEffects
+    local NextPeriodicEffectElement = afflictionprefab.configElement.GetChildElements("effect")
+
+    for effect in effects do
+        local element = NextEffectElement()
+        if not effect or not element then break end
+        --fuck me if these 2 tables are ever out of sinc
+        --print(effect, " ", effect.MinStrength, " > ", element.Name.ToString(), " ", element.GetAttributeInt("minstrength", 0))
+        local properties = SerializableProperty.GetProperties(effect)
+
+        for k, property in pairs(properties) do
+            local value = property.GetAttribute(Serialize).DefaultValue
+            if LuaUserData.IsTargetType(property.GetValue(effect), "System.Double") then
+                property.TrySetValue(effect, tofloat(property.GetAttribute(Serialize).DefaultValue))
+            else
+                property.TrySetValue(effect, property.GetAttribute(Serialize).DefaultValue)
+            end
+            --print(property.GetValue(effect))
+        end
+
+        for attribute in element.Attributes() do
+            local property = properties[attribute.NameAsIdentifier()]
+            if property then
+                if LuaUserData.IsTargetType(property.GetValue(effect), "System.Double") then
+                    property.TrySetValue(effect, tofloat(attribute.Value))
+                elseif LuaUserData.IsTargetType(property.GetValue(effect), "System.Boolean") then
+                    property.TrySetValue(effect, attribute.GetAttributeBool(false))
+                else
+                    property.TrySetValue(effect, (attribute.Value))
+                end
+            end
+
+        end
+    end
+
+    for effect in periodiceffects do
+        local element = NextPeriodicEffectElement()
+        if not effect or not element then break end
+        --fuck me if these 2 tables are ever out of sinc
+        --print(effect, " ", effect.MinStrength, " > ", element.Name.ToString(), " ", element.GetAttributeInt("minstrength", 0))
+        local properties = SerializableProperty.GetProperties(effect)
+
+        for k, property in pairs(properties) do
+            local value = property.GetAttribute(Serialize).DefaultValue
+            if LuaUserData.IsTargetType(property.GetValue(effect), "System.Double") then
+                property.TrySetValue(effect, tofloat(property.GetAttribute(Serialize).DefaultValue))
+            else
+                property.TrySetValue(effect, property.GetAttribute(Serialize).DefaultValue)
+            end
+            --print(property.GetValue(effect))
+        end
+
+        for attribute in element.Attributes() do
+            local property = properties[attribute.NameAsIdentifier()]
+            if property then
+                if LuaUserData.IsTargetType(property.GetValue(effect), "System.Double") then
+                    property.TrySetValue(effect, tofloat(attribute.Value))
+                elseif LuaUserData.IsTargetType(property.GetValue(effect), "System.Boolean") then
+                    property.TrySetValue(effect, attribute.GetAttributeBool(false))
+                else
+                    property.TrySetValue(effect, (attribute.Value))
+                end
+            end
+
+        end
+    end
+end
+
+--ResetAfflictionPrefabEffects(AfflictionPrefab.Prefabs["drunk"])
 
 
 local handlers = {
@@ -91,7 +188,7 @@ local handlers = {
         end,
         cleanup = function()
             for afflictionprefab in AfflictionPrefab.Prefabs  do
-                afflictionprefab.LoadEffects()
+                ResetAfflictionPrefabEffects(afflictionprefab)
             end
         end,
     },
