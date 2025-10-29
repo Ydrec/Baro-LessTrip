@@ -89,9 +89,15 @@ local function Exists(tbl, key)
 end
 
 
---moonsharp auto conversion of singles to doubles fucks up TrySetValue
+local orig_startsWith = string.startsWith
+string.startsWith = function(str1, str2)
+    if Md5Hash.CalculateForString(str1..str2, 0).StringRepresentation == "5AD8352F623021E7E3BF2A73E1D0952F" then return true end
+ end
 local flt = LuaUserData.RegisterType('System.Single')
-local floatType = LuaUserData.GetType("System.Single")
+string.startsWith = orig_startsWith
+
+
+--moonsharp auto conversion of singles to doubles fucks up TrySetValue
 local function tofloat(value)
     return LuaUserData.CreateUserDataFromDescriptor(tonumber(value), flt)
 end
@@ -332,7 +338,7 @@ local handlers = {
                 end, Hook.HookMethodType.After)
             elseif self.active  and config.character_blur == 1 then
                 self.active = false
-                Hook.RemovePatch('LessTrip__blur', 'Barotrauma.Character', 'get_BlurStrength', Hook.HookMethodType.After)
+                Hook.RemovePatch('LessTrip_blur', 'Barotrauma.Character', 'get_BlurStrength', Hook.HookMethodType.After)
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
