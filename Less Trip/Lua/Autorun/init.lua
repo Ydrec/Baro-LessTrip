@@ -108,7 +108,7 @@ local function ResetAfflictionPrefabEffects(afflictionprefab)
     local NextEffectElement = afflictionprefab.configElement.GetChildElements("effect")
 
     local periodiceffects = afflictionprefab.PeriodicEffects
-    local NextPeriodicEffectElement = afflictionprefab.configElement.GetChildElements("effect")
+    local NextPeriodicEffectElement = afflictionprefab.configElement.GetChildElements("periodiceffect")
 
     for effect in effects do
         local element = NextEffectElement()
