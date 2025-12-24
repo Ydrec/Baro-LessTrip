@@ -1,20 +1,26 @@
 if SERVER then return end
 
+local configversion = 2
 
 local defaultconfig = {
-    affliction_overlay = 0.5,
-    affliction_distort = 0.5,
-    affliction_blur = 0.5,
-    affliction_grain = 0.5,
-    affliction_chromaticaberration = 0.5,
-    affliction_radialdistort = 0.5,
-    affliction_effectfluctuationfrequency = 1,
-    character_distort = 1,
-    character_radialdistort = 1,
-    character_blur = 1,
-    character_grain = 1,
-    character_chromaticaberration = 1,
-    screenshake = 1,
+    version = configversion,
+    data = {
+        affliction_overlay = 0.5,
+        -- affliction_distort = 0.5,
+        -- affliction_blur = 0.5,
+        -- affliction_grain = 0.5,
+        -- affliction_chromaticaberration = 0.5,
+        -- affliction_radialdistort = 0.5,
+        affliction_effectfluctuationfrequency = 1,
+        distort = 0.5,
+        radialdistort = 0.5,
+        blur = 0.5,
+        grain = 0.5,
+        chromaticaberration = 0.5,
+        screenshake = 0.5,
+        collapseeffect = 1,
+        rotation = 0.5,
+    }
 }
 
 
@@ -27,10 +33,30 @@ end
 
 local config = json.parse(File.Read(configFilePath))
 
+
+local function CheckConfigVersion()
+    if not config.version then
+        local tmpconfig = {}
+        tmpconfig.data = {}
+        tmpconfig.version = 2
+        tmpconfig.data.affliction_overlay = config.affliction_overlay
+        tmpconfig.data.affliction_effectfluctuationfrequency = config.affliction_effectfluctuationfrequency
+
+        tmpconfig.data.distort = config.character_distort
+        tmpconfig.data.radialdistort = config.character_radialdistort
+        tmpconfig.data.blur = config.character_blur
+        tmpconfig.data.grain = config.character_grain
+        tmpconfig.data.chromaticaberration = config.character_chromaticaberration
+        tmpconfig.data.screenshake = config.screenshake
+        config = tmpconfig
+    end
+end
+
+
 local function CheckConfigHasAllKeys(config, keys)
     for k in keys do
-        if not config[k] then
-            config[k] = defaultconfig[k] or 1
+        if not config.data[k] then
+            config.data[k] = defaultconfig.data[k] or 1
         end
     end
 end
@@ -39,6 +65,8 @@ local function SaveConfig()
     File.Write(configFilePath, json.serialize(config))
 end
 
+LuaUserData.RegisterType('Barotrauma.MathUtils')
+local MathUtils = LuaUserData.CreateStatic('Barotrauma.MathUtils')
 
 LuaUserData.RegisterType('Barotrauma.AfflictionPrefab+Effect')
 local Effect = LuaUserData.CreateStatic('Barotrauma.AfflictionPrefab+Effect')
@@ -65,6 +93,12 @@ LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effe
 LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effect'], 'MinChromaticAberration')
 
 LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.AfflictionPrefab+Effect'], 'ScreenEffectFluctuationFrequency')
+
+LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.Character'], 'ChromaticAberrationStrength')
+
+LuaUserData.MakePropertyAccessible(Descriptors['Barotrauma.Camera'], 'ShakePosition')
+
+LuaUserData.MakeFieldAccessible(Descriptors['Barotrauma.Camera'], 'rotation')
 
 --LuaUserData.MakeMethodAccessible(Descriptors['Barotrauma.AfflictionPrefab'], 'LoadEffects')
 
@@ -181,14 +215,11 @@ end
 local handlers = {
     affliction_overlay = {
         func = function(self, mult) --ApplyOverlayMultiplier
-            if mult then
-                config.affliction_overlay = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
+            mult = math.clamp(mult or config.data.distort, 0, 1)
             for afflictionprefab in AfflictionPrefab.Prefabs  do
                 for effect in afflictionprefab.Effects do
-                    effect.MaxAfflictionOverlayAlphaMultiplier = effect.MaxAfflictionOverlayAlphaMultiplier * config.affliction_overlay
-                    effect.MinAfflictionOverlayAlphaMultiplier = effect.MinAfflictionOverlayAlphaMultiplier * config.affliction_overlay
+                    effect.MaxAfflictionOverlayAlphaMultiplier = effect.MaxAfflictionOverlayAlphaMultiplier * mult
+                    effect.MinAfflictionOverlayAlphaMultiplier = effect.MinAfflictionOverlayAlphaMultiplier * mult
                 end
             end  
         end,
@@ -198,208 +229,196 @@ local handlers = {
             end
         end,
     },
-    affliction_distort = {
-        func = function(self, mult) --ApplyDisortMultiplier
-            if mult then
-                config.affliction_distort = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            for afflictionprefab in AfflictionPrefab.Prefabs  do
-                for effect in afflictionprefab.Effects do
-                    effect.MaxScreenDistort = effect.MaxScreenDistort * config.affliction_distort
-                    effect.MinScreenDistort = effect.MinScreenDistort * config.affliction_distort
-                end
-            end  
-        end,
-        cleanup = nil, --already handled by affliction_overlay cleanup
-    },
-    affliction_radialdistort = {
-        func = function(self, mult)
-            if mult then
-                config.affliction_radialdistort = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            for afflictionprefab in AfflictionPrefab.Prefabs  do
-                for effect in afflictionprefab.Effects do
-                    effect.MaxRadialDistort = effect.MaxRadialDistort * config.affliction_radialdistort
-                    effect.MinRadialDistort = effect.MinRadialDistort * config.affliction_radialdistort
-                end
-            end  
-        end,
-        cleanup = nil, --already handled by affliction_overlay cleanup
-    },
-    affliction_blur = {
-        func = function(self, mult)
-            if mult then
-                config.affliction_blur = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            for afflictionprefab in AfflictionPrefab.Prefabs  do
-                for effect in afflictionprefab.Effects do
-                    effect.MaxScreenBlur = effect.MaxScreenBlur * config.affliction_blur
-                    effect.MinScreenBlur = effect.MinScreenBlur * config.affliction_blur
-                end
-            end  
-        end,
-        cleanup = nil, --already handled by affliction_overlay cleanup
-    },
-    affliction_grain = {
-        func = function(self, mult)
-            if mult then
-                config.affliction_grain = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            for afflictionprefab in AfflictionPrefab.Prefabs  do
-                for effect in afflictionprefab.Effects do
-                    effect.MaxGrainStrength = effect.MaxGrainStrength * config.affliction_grain
-                    effect.MinGrainStrength = effect.MinGrainStrength * config.affliction_grain
-                end
-            end  
-        end,
-        cleanup = nil, --already handled by affliction_overlay cleanup
-    },
-    affliction_chromaticaberration = {
-        func = function(self, mult)
-            if mult then
-                config.affliction_chromaticaberration = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            for afflictionprefab in AfflictionPrefab.Prefabs  do
-                for effect in afflictionprefab.Effects do
-                    effect.MaxChromaticAberration = effect.MaxChromaticAberration * config.affliction_chromaticaberration
-                    effect.MinChromaticAberration = effect.MinChromaticAberration * config.affliction_chromaticaberration
-                end
-            end  
-        end,
-        cleanup = nil, --already handled by affliction_overlay cleanup
-    },
+    -- affliction_distort = {
+    --     func = function(self, mult) --ApplyDisortMultiplier
+    --         if mult then
+    --             config.affliction_distort = math.min(math.max(mult, 0), 1)
+    --             SaveConfig()
+    --         end
+    --         for afflictionprefab in AfflictionPrefab.Prefabs  do
+    --             for effect in afflictionprefab.Effects do
+    --                 effect.MaxScreenDistort = effect.MaxScreenDistort * config.affliction_distort
+    --                 effect.MinScreenDistort = effect.MinScreenDistort * config.affliction_distort
+    --             end
+    --         end  
+    --     end,
+    --     cleanup = nil, --already handled by affliction_overlay cleanup
+    -- },
+    -- affliction_radialdistort = {
+    --     func = function(self, mult)
+    --         if mult then
+    --             config.affliction_radialdistort = math.min(math.max(mult, 0), 1)
+    --             SaveConfig()
+    --         end
+    --         for afflictionprefab in AfflictionPrefab.Prefabs  do
+    --             for effect in afflictionprefab.Effects do
+    --                 effect.MaxRadialDistort = effect.MaxRadialDistort * config.affliction_radialdistort
+    --                 effect.MinRadialDistort = effect.MinRadialDistort * config.affliction_radialdistort
+    --             end
+    --         end  
+    --     end,
+    --     cleanup = nil, --already handled by affliction_overlay cleanup
+    -- },
+    -- affliction_blur = {
+    --     func = function(self, mult)
+    --         if mult then
+    --             config.affliction_blur = math.min(math.max(mult, 0), 1)
+    --             SaveConfig()
+    --         end
+    --         for afflictionprefab in AfflictionPrefab.Prefabs  do
+    --             for effect in afflictionprefab.Effects do
+    --                 effect.MaxScreenBlur = effect.MaxScreenBlur * config.affliction_blur
+    --                 effect.MinScreenBlur = effect.MinScreenBlur * config.affliction_blur
+    --             end
+    --         end  
+    --     end,
+    --     cleanup = nil, --already handled by affliction_overlay cleanup
+    -- },
+    -- affliction_grain = {
+    --     func = function(self, mult)
+    --         if mult then
+    --             config.affliction_grain = math.min(math.max(mult, 0), 1)
+    --             SaveConfig()
+    --         end
+    --         for afflictionprefab in AfflictionPrefab.Prefabs  do
+    --             for effect in afflictionprefab.Effects do
+    --                 effect.MaxGrainStrength = effect.MaxGrainStrength * config.affliction_grain
+    --                 effect.MinGrainStrength = effect.MinGrainStrength * config.affliction_grain
+    --             end
+    --         end  
+    --     end,
+    --     cleanup = nil, --already handled by affliction_overlay cleanup
+    -- },
+    -- affliction_chromaticaberration = {
+    --     func = function(self, mult)
+    --         if mult then
+    --             config.affliction_chromaticaberration = math.min(math.max(mult, 0), 1)
+    --             SaveConfig()
+    --         end
+    --         for afflictionprefab in AfflictionPrefab.Prefabs  do
+    --             for effect in afflictionprefab.Effects do
+    --                 effect.MaxChromaticAberration = effect.MaxChromaticAberration * config.affliction_chromaticaberration
+    --                 effect.MinChromaticAberration = effect.MinChromaticAberration * config.affliction_chromaticaberration
+    --             end
+    --         end  
+    --     end,
+    --     cleanup = nil, --already handled by affliction_overlay cleanup
+    -- },
     affliction_effectfluctuationfrequency = {
         func = function(self, mult)
-            if mult then
-                config.affliction_effectfluctuationfrequency = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
+            mult = math.clamp(mult or config.data.distort, 0, 1)
             for afflictionprefab in AfflictionPrefab.Prefabs  do
                 for effect in afflictionprefab.Effects do
-                    effect.ScreenEffectFluctuationFrequency = effect.ScreenEffectFluctuationFrequency * config.affliction_effectfluctuationfrequency
+                    effect.ScreenEffectFluctuationFrequency = effect.ScreenEffectFluctuationFrequency * mult
                 end
             end  
         end,
         cleanup = nil, --already handled by affliction_overlay cleanup
     },
-    character_distort = {
+    distort = {
         func = function(self, mult)
-            if mult then
-                config.character_distort = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            if not self.active and config.character_distort ~= 1 then
-                self.active = true
+            --multiplier gets baked into patch closure to minimize lookup time but have to rehook method to update it
+            mult = math.clamp(mult or config.data.distort, 0, 1)
+            Hook.RemovePatch('LessTrip_distort', 'Barotrauma.Character', 'get_DistortStrength', Hook.HookMethodType.After)
+            if mult ~= 1 then
                 Hook.Patch('LessTrip_distort', 'Barotrauma.Character', 'get_DistortStrength', function(instance, ptable) 
-                    return ptable.ReturnValue * config.character_distort
+                    return ptable.ReturnValue * mult
                 end, Hook.HookMethodType.After)
-            elseif self.active and config.character_distort == 1 then
-                self.active = false
-                Hook.RemovePatch('LessTrip_distort', 'Barotrauma.Character', 'get_DistortStrength', Hook.HookMethodType.After)
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
-        active = false,
     },
-    character_radialdistort = {
+    radialdistort = {
         func = function(self, mult)
-            if mult then
-                config.character_radialdistort = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            if not self.active and config.character_radialdistort ~= 1 then
-                self.active = true
-                Hook.Patch('LessTrip_radialdistortdistort', 'Barotrauma.Character', 'get_RadialDistortStrength', function(instance, ptable) 
-                    return ptable.ReturnValue * config.character_radialdistort
+            mult = math.clamp(mult or config.data.radialdistort, 0, 1)
+            Hook.RemovePatch('LessTrip_radialdistort', 'Barotrauma.Character', 'get_RadialDistortStrength', Hook.HookMethodType.After)
+            if mult ~= 1 then
+                Hook.Patch('LessTrip_radialdistort', 'Barotrauma.Character', 'get_RadialDistortStrength', function(instance, ptable) 
+                    return ptable.ReturnValue * mult
                 end, Hook.HookMethodType.After)
-            elseif self.active and config.character_radialdistort == 1 then
-                self.active = false
-                Hook.RemovePatch('LessTrip_radialdistort', 'Barotrauma.Character', 'get_RadialDistortStrength', Hook.HookMethodType.After)
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
-        active = false,
     },
-    character_blur = {
+    blur = {
         func = function(self, mult)
-            if mult then
-                config.character_blur = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            if not self.active and config.character_blur ~= 1 then
-                self.active = true
+            mult = math.clamp(mult or config.data.blur, 0, 1)
+            Hook.RemovePatch('LessTrip_blur', 'Barotrauma.Character', 'get_BlurStrength', Hook.HookMethodType.After)
+            if mult ~= 1 then
                 Hook.Patch('LessTrip_blur', 'Barotrauma.Character', 'get_BlurStrength', function(instance, ptable) 
-                    return ptable.ReturnValue * config.character_blur
-                end, Hook.HookMethodType.After)
-            elseif self.active  and config.character_blur == 1 then
-                self.active = false
-                Hook.RemovePatch('LessTrip_blur', 'Barotrauma.Character', 'get_BlurStrength', Hook.HookMethodType.After)
+                    return ptable.ReturnValue * mult
+                end, Hook.HookMethodType.After)                
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
-        active = false,
     },
-    character_grain = {
+    grain = {
         func = function(self, mult)
-            if mult then
-                config.character_grain = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            if not self.active and config.character_grain ~= 1 then
-                self.active = true
+            mult = math.clamp(mult or config.data.grain, 0, 1)
+            Hook.RemovePatch('LessTrip_grain', 'Barotrauma.Character', 'get_GrainStrength', Hook.HookMethodType.After)
+            if mult ~= 1 then
                 Hook.Patch('LessTrip_grain', 'Barotrauma.Character', 'get_GrainStrength', function(instance, ptable) 
-                    return ptable.ReturnValue * config.character_grain
+                    return ptable.ReturnValue * mult
                 end, Hook.HookMethodType.After)
-            elseif self.active and config.character_grain == 1 then
-                self.active = false
-                Hook.RemovePatch('LessTrip_grain', 'Barotrauma.Character', 'get_GrainStrength', Hook.HookMethodType.After)
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
-        active = false,
     },
-    character_chromaticaberration = {
+    chromaticaberration = {
         func = function(self, mult)
-            if mult then
-                config.character_chromaticaberration = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            if not self.active and config.character_chromaticaberration ~= 1 then
+            mult = math.clamp(mult or config.data.chromaticaberration, 0, 1)
+            Hook.RemovePatch('LessTrip_chromaticaberration_char', 'Barotrauma.Character', 'get_ChromaticAberrationStrength', Hook.HookMethodType.After)
+            Hook.RemovePatch('LessTrip_chromaticaberration_level', 'Barotrauma.LevelRenderer', 'get_ChromaticAberrationStrength', Hook.HookMethodType.After)
+            if  mult ~= 1 then
                 self.active = true
-                Hook.Patch('LessTrip_chromaticaberration', 'Barotrauma.Character', 'get_ChromaticAberrationStrength', function(instance, ptable) 
-                    return ptable.ReturnValue * config.character_chromaticaberration
+                Hook.Patch('LessTrip_chromaticaberration_char', 'Barotrauma.Character', 'get_ChromaticAberrationStrength', function(instance, ptable) 
+                    return ptable.ReturnValue * mult
                 end, Hook.HookMethodType.After)
-            elseif self.active and config.character_chromaticaberration == 1 then
-                self.active = false
-                Hook.RemovePatch('LessTrip_chromaticaberration', 'Barotrauma.Character', 'get_ChromaticAberrationStrength', Hook.HookMethodType.After)
+                Hook.Patch('LessTrip_chromaticaberration_level', 'Barotrauma.LevelRenderer', 'get_ChromaticAberrationStrength', function(instance, ptable) 
+                    return ptable.ReturnValue * mult
+                end, Hook.HookMethodType.After)
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
-        active = false,
     },
     screenshake = {
-        func = function(self, mult)
-            if mult then
-                config.screenshake = math.min(math.max(mult, 0), 1)
-                SaveConfig()
-            end
-            if not self.active and config.screenshake ~= 1 then
-                self.active = true
+        func = function(self, mult))
+            mult = math.clamp(mult or config.data.screenshake, 0, 1)
+            Hook.RemovePatch('LessTrip_screenshake', 'Barotrauma.Camera', 'get_ShakePosition', Hook.HookMethodType.After)
+            if mult ~= 1 then
                 Hook.Patch('LessTrip_screenshake', 'Barotrauma.Camera', 'get_ShakePosition', function(instance, ptable)
-                    return ptable.ReturnValue * config.screenshake
+                    return ptable.ReturnValue * mult
                 end, Hook.HookMethodType.After)
-            elseif self.active and config.screenshake == 1 then
-                self.active = false
-                Hook.RemovePatch('LessTrip_screenshake', 'Barotrauma.Camera', 'get_ShakePosition', Hook.HookMethodType.After)
             end
         end,
         cleanup = nil, --Lua patches are not persistent, dont need to clean
-        active = false,
+    },
+    collapseeffect = {
+        func = function(self, mult))
+            mult = math.clamp(mult or config.data.collapseeffect, 0, 1)
+            Hook.RemovePatch('LessTrip_collapseeffect', 'Barotrauma.Character', 'set_CollapseEffectStrength', Hook.HookMethodType.After)
+            if mult ~= 1 then
+                Hook.Patch('LessTrip_collapseeffect', 'Barotrauma.Character', 'set_CollapseEffectStrength', function(instance, ptable)
+                    Level.Loaded.Renderer.CollapseEffectStrength = 0
+                end, Hook.HookMethodType.After)
+            end
+        end,
+        cleanup = nil, --Lua patches are not persistent, dont need to clean
+    },
+    rotation = {
+        func = function(self, mult))
+            mult = math.clamp(mult or config.data.rotation, 0, 1)
+            Hook.RemovePatch('LessTrip_rotation', 'Barotrauma.Camera', 'set_Rotation', Hook.HookMethodType.Before)
+            if mult ~= 1 then
+                Hook.Patch('LessTrip_rotation', 'Barotrauma.Camera', 'set_Rotation', function(instance, ptable)
+                    if MathUtils.IsValid(ptable["value"]) then
+                        instance.rotation = ptable["value"] * mult
+                    end
+                    ptable.PreventExecution = true
+                end, Hook.HookMethodType.Before)
+            end
+        end,
+        cleanup = nil, --Lua patches are not persistent, dont need to clean
     },
 }
 
@@ -409,20 +428,31 @@ for k, v in pairs(handlers) do
     table.insert(handlerKeys, k)
 end
 
+CheckConfigVersion()
+
 CheckConfigHasAllKeys(config, handlerKeys)
 
 Game.AddCommand("lesstrip", "lesstrip [effecttype] [0-1]: Multiplies various effects by set values. 1 = no changes; 0 = completely invisible. Is persistent between sessions. character_ effects have small performance cost as always running patches but its necessary to override hardcoded effects: OxygenLow screen distort etc. Setting them to 1 removes patches.",
     function (args)
-        if args[1] == nil then 
+        if args[1] == nil then
             print("current values:")
-            for k, v in pairs(config) do
-                print(k, " = ", v)
+            for k, v in pairs(config.data) do
+                local note = ""
+                if k == "collapseeffect" then
+                    note = "   Note: Can only be On/Off, granular control would require rewriting rendering for it and lua would burn fps"
+                end
+                print(k, " = ", v, note)
             end
             return
         elseif args[2] and tonumber(args[2]) then
             handler = Exists(handlers, args[1])
             if not handler then print("unknown handler") return end
-            handler:func(tonumber(args[2]))
+            if args[1] == "collapseeffect" then
+                args[2] = tonumber(args[2]) < 1 and 0 or 1
+            end
+            config.data[args[1]] = math.clamp(tonumber(args[2]), 0, 1)
+            handler:func()
+            SaveConfig()
         else
             print("Invalid arguments")
         end
@@ -430,6 +460,33 @@ Game.AddCommand("lesstrip", "lesstrip [effecttype] [0-1]: Multiplies various eff
     --GetValidArguments
     function()
         return {handlerKeys,{"0", "1"}}
+    end
+)
+
+Game.AddCommand("lesstrip_debug", "lesstrip [0-2]: 0 = Use config values, 1 = Hide all effects, 2 = Show all effects",
+    function (args)
+        if args[1] == nil then
+            print("0 = Use config values, 1 = Hide all effects, 2 = Show all effects")
+            return
+        elseif args[1] == "0" then
+            for k, handler in pairs(handlers) do
+                if handler.func then
+                    handler:func()
+                end
+            end
+        elseif args[1] == "1" then
+            for key, handler in pairs(handlers) do
+                handler:func(0)
+            end
+        elseif args[1] == "2" then
+            for key, handler in pairs(handlers) do
+                handler:func(1)
+            end
+        end
+    end,
+    --GetValidArguments
+    function()
+        return {{"0", "1", "2"}}
     end
 )
 
